@@ -3,16 +3,36 @@ import TradingViewWidget from './components/TradingViewWidget';
 import { TechnicalGauge } from './components/TechnicalGauge';
 import { PredictionPanel } from './components/PredictionPanel';
 import { NewsFeed } from './components/NewsFeed';
-import { RefreshCw, Activity, Zap } from 'lucide-react';
+import { SettingsModal } from './components/SettingsModal';
+import { RefreshCw, Activity, Zap, Settings } from 'lucide-react';
 
 export default function App() {
   const [data, setData] = useState<{ ta: any, analysis: any } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  // Load settings from localStorage or defaults
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem('xau-terminal-settings');
+    if (saved) return JSON.parse(saved);
+    return { geminiKey: "", symbol: "OANDA:XAUUSD" };
+  });
 
-  const fetchState = async () => {
+  const handleSaveSettings = (newSettings: { geminiKey: string; symbol: string }) => {
+    setSettings(newSettings);
+    localStorage.setItem('xau-terminal-settings', JSON.stringify(newSettings));
+    // Re-fetch with new API key if provided
+    fetchState(newSettings);
+  };
+
+  const fetchState = async (currentSettings = settings) => {
     try {
       setLoading(true);
-      const res = await fetch('/api/state');
+      const res = await fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentSettings)
+      });
       if (res.ok) {
         const json = await res.json();
         setData(json);
@@ -27,12 +47,20 @@ export default function App() {
   useEffect(() => {
     fetchState();
     // Poll every 1 minute
-    const interval = setInterval(fetchState, 60000);
+    const interval = setInterval(() => fetchState(settings), 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [settings]);
 
   return (
     <div className="min-h-screen bg-[#080808] text-white selection:bg-[#D4AF37]/30 font-sans p-4 md:p-8">
+      {/* Settings Modal */}
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        onSave={handleSaveSettings}
+        currentSettings={settings}
+      />
+
       {/* Header */}
       <header className="max-w-[1600px] mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -52,7 +80,15 @@ export default function App() {
            </div>
            <div className="h-6 w-px bg-gray-800" />
            <button 
-             onClick={fetchState} 
+             onClick={() => setIsSettingsOpen(true)}
+             className="px-3 py-1.5 flex items-center gap-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors text-sm font-medium focus:outline-none"
+             title="Back Office configuration"
+           >
+             <Settings size={16} />
+             Settings
+           </button>
+           <button 
+             onClick={() => fetchState(settings)} 
              disabled={loading}
              className="px-4 py-1.5 flex items-center gap-2 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] rounded-lg transition-colors text-sm font-medium focus:outline-none disabled:opacity-50"
            >
@@ -73,7 +109,7 @@ export default function App() {
                 <Zap size={14} className="text-emerald-400" />
                 <span className="text-xs font-mono text-gray-300">Live Advanced Spot</span>
              </div>
-             <TradingViewWidget />
+             <TradingViewWidget symbol={settings.symbol} />
            </div>
            
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

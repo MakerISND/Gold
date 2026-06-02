@@ -1,7 +1,7 @@
 // TradingViewWidget.jsx
 import React, { useEffect, useRef, memo } from 'react';
 
-function TradingViewWidget() {
+function TradingViewWidget({ symbol = "OANDA:XAUUSD" }: { symbol?: string }) {
   const container = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -17,7 +17,7 @@ function TradingViewWidget() {
     script.innerHTML = `
       {
         "autosize": true,
-        "symbol": "OANDA:XAUUSD",
+        "symbol": "${symbol}",
         "interval": "15",
         "timezone": "Etc/UTC",
         "theme": "dark",

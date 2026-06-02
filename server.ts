@@ -70,7 +70,7 @@ async function fetchRealNews() {
   }
 }
 
-async function analyzeWithGemini(news: any[], taRef: string) {
+async function analyzeWithGemini(news: any[], taRef: string, customApiKey?: string) {
   try {
     const prompt = `
       You are an expert financial AI engineer analyzing Gold Spot (XAU/USD).
@@ -83,7 +83,7 @@ async function analyzeWithGemini(news: any[], taRef: string) {
 
       Technical Analysis Bias: ${taRef}
       News:
-      ${news.map(n => `- ${n.title}`).join('\n')}
+      ${news.map((n: any) => `- ${n.title}`).join('\n')}
 
       Return ONLY valid JSON in this exact structure:
       {
@@ -104,7 +104,9 @@ async function analyzeWithGemini(news: any[], taRef: string) {
       }
     `;
 
-    const response = await ai.models.generateContent({
+    const aiClient = customApiKey ? new GoogleGenAI({ apiKey: customApiKey }) : ai;
+
+    const response = await aiClient.models.generateContent({
       model: 'models/gemini-1.5-flash',
       contents: prompt,
       config: {
@@ -129,14 +131,16 @@ async function analyzeWithGemini(news: any[], taRef: string) {
   }
 }
 
-app.get("/api/state", async (req, res) => {
+app.post("/api/state", async (req, res) => {
+  const { geminiKey, symbol, interval } = req.body || {};
+
   const taState = generateMockTA();
   
   const now = Date.now();
-  // Cache the prediction for 5 minutes to avoid spamming the API and rapid shifting on the UI
-  if (!lastNewsAndPrediction || now - cachedPredictionTime > 5 * 60 * 1000) {
+  // Cache the prediction for 1 minute to avoid spamming the API and rapid shifting on the UI
+  if (!lastNewsAndPrediction || now - cachedPredictionTime > 60 * 1000) {
     const news = await fetchRealNews();
-    const predictionData = await analyzeWithGemini(news, taState.gaugeBias);
+    const predictionData = await analyzeWithGemini(news, taState.gaugeBias, geminiKey);
     
     // Add the source and time back into the classified news
     const finalNews = predictionData.classifiedNews?.map((item: any) => {
